@@ -16,7 +16,7 @@ const FALLBACK_SHOP_NOS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 function getDefaultDateRange() {
   const end = new Date();
   const start = new Date(end);
-  start.setDate(start.getDate() - 7);
+  start.setDate(start.getDate() - 6);
 
   return {
     startDate: start.toISOString().slice(0, 10),
@@ -69,6 +69,14 @@ export async function GET(request: NextRequest) {
 
   const defaults = getDefaultDateRange();
   const selectedShopNo = request.nextUrl.searchParams.get("shop_no") ?? "all";
+  const pageLimit = Math.min(
+    Math.max(Number(request.nextUrl.searchParams.get("limit") ?? "100"), 1),
+    100
+  );
+  const maxPages = Math.min(
+    Math.max(Number(request.nextUrl.searchParams.get("max_pages") ?? "10"), 1),
+    20
+  );
   const baseParams = new URLSearchParams();
   baseParams.set(
     "start_date",
@@ -78,7 +86,7 @@ export async function GET(request: NextRequest) {
     "end_date",
     request.nextUrl.searchParams.get("end_date") ?? defaults.endDate
   );
-  baseParams.set("limit", request.nextUrl.searchParams.get("limit") ?? "100");
+  baseParams.set("limit", String(pageLimit));
   baseParams.set(
     "embed",
     request.nextUrl.searchParams.get("embed") ?? "items"
@@ -100,33 +108,13 @@ export async function GET(request: NextRequest) {
     shops = [{ shop_no: Number(selectedShopNo) }];
   }
 
-  const shopResults = await Promise.all(
-    shops.map(async (shop) => {
-      const params = new URLSearchParams(baseParams);
-      params.set("shop_no", String(shop.shop_no));
-      const ordersResponse = await fetchAdmin("orders", params);
-      const payload = await ordersResponse.json();
+  const shopResults = await Promise.all(shops.map(fetchOrdersForShop));
 
-      return {
-        shop,
-        ok: ordersResponse.ok,
-        status: ordersResponse.status,
-        payload
-      };
-    })
-  );
-
-  const orders = shopResults.flatMap((result) => {
-    if (!result.ok || !Array.isArray(result.payload.orders)) {
-      return [];
-    }
-
-    return result.payload.orders.map((order: Record<string, unknown>) => ({
-      ...order,
-      shop_no: order.shop_no ?? result.shop.shop_no,
-      shop_name: result.shop.shop_name
-    }));
-  });
+  const orders = shopResults
+    .flatMap((result) => result.orders)
+    .sort((a, b) =>
+      String(b.order_date ?? "").localeCompare(String(a.order_date ?? ""))
+    );
 
   const response = NextResponse.json({
     mall_id: connectedMallId,
@@ -144,6 +132,48 @@ export async function GET(request: NextRequest) {
   applyTokenCookies(response, refreshedToken);
 
   return response;
+
+  async function fetchOrdersForShop(shop: Cafe24Shop) {
+    const orders: Record<string, unknown>[] = [];
+
+    for (let page = 0; page < maxPages; page += 1) {
+      const params = new URLSearchParams(baseParams);
+      params.set("shop_no", String(shop.shop_no));
+      params.set("offset", String(page * pageLimit));
+
+      const ordersResponse = await fetchAdmin("orders", params);
+      const payload = await ordersResponse.json();
+
+      if (!ordersResponse.ok || !Array.isArray(payload.orders)) {
+        return {
+          shop,
+          ok: false,
+          status: ordersResponse.status,
+          payload,
+          orders
+        };
+      }
+
+      const pageOrders = payload.orders.map((order: Record<string, unknown>) => ({
+        ...order,
+        shop_no: order.shop_no ?? shop.shop_no,
+        shop_name: shop.shop_name
+      }));
+      orders.push(...pageOrders);
+
+      if (pageOrders.length < pageLimit) {
+        break;
+      }
+    }
+
+    return {
+      shop,
+      ok: true,
+      status: 200,
+      payload: null,
+      orders
+    };
+  }
 }
 
 function applyTokenCookies(

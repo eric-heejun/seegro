@@ -29,6 +29,15 @@ type Cafe24Order = {
   items?: Cafe24OrderItem[];
 };
 
+const DATE_PRESETS = [
+  { id: "today", label: "오늘", days: 1 },
+  { id: "7d", label: "최근 7일", days: 7 },
+  { id: "14d", label: "최근 14일", days: 14 },
+  { id: "30d", label: "최근 30일", days: 30 }
+] as const;
+
+type DatePresetId = (typeof DATE_PRESETS)[number]["id"] | "custom";
+
 function toNumber(value: string | number | undefined) {
   const numberValue = Number(value ?? 0);
   return Number.isFinite(numberValue) ? numberValue : 0;
@@ -60,10 +69,30 @@ function getErrorMessage(payload: unknown, fallback: string) {
   return fallback;
 }
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getPresetRange(days: number) {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(end.getDate() - (days - 1));
+
+  return {
+    startDate: formatDateInput(start),
+    endDate: formatDateInput(end)
+  };
+}
+
 export default function Dashboard() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [orders, setOrders] = useState<Cafe24Order[]>([]);
   const [shopNo, setShopNo] = useState("all");
+  const [datePreset, setDatePreset] = useState<DatePresetId>("7d");
+  const [dateRange, setDateRange] = useState(() => getPresetRange(7));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -86,12 +115,22 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function loadOrders() {
+      if (dateRange.startDate > dateRange.endDate) {
+        setOrders([]);
+        setLoading(false);
+        setError("시작일은 종료일보다 늦을 수 없습니다.");
+        return;
+      }
+
       setLoading(true);
       setError("");
       try {
         const params = new URLSearchParams({
           shop_no: shopNo,
-          limit: "100"
+          start_date: dateRange.startDate,
+          end_date: dateRange.endDate,
+          limit: "100",
+          max_pages: "10"
         });
         const response = await fetch(`/api/cafe24/orders?${params}`);
         const payload = await response.json();
@@ -119,7 +158,12 @@ export default function Dashboard() {
     }
 
     loadOrders();
-  }, [shopNo]);
+  }, [shopNo, dateRange.startDate, dateRange.endDate]);
+
+  function applyPreset(days: number, presetId: DatePresetId) {
+    setDatePreset(presetId);
+    setDateRange(getPresetRange(days));
+  }
 
   const shopNameByNo = useMemo(() => {
     const map = new Map<number, string>();
@@ -158,19 +202,71 @@ export default function Dashboard() {
       </section>
 
       <section className="dashboardControls">
-        <label htmlFor="shop_no">쇼핑몰</label>
-        <select
-          id="shop_no"
-          value={shopNo}
-          onChange={(event) => setShopNo(event.target.value)}
-        >
-          <option value="all">전체 쇼핑몰</option>
-          {shops.map((shop) => (
-            <option key={shop.shop_no} value={shop.shop_no}>
-              {shop.shop_name ?? `Shop ${shop.shop_no}`} ({shop.shop_no})
-            </option>
-          ))}
-        </select>
+        <div className="controlGroup">
+          <label htmlFor="shop_no">쇼핑몰</label>
+          <select
+            id="shop_no"
+            value={shopNo}
+            onChange={(event) => setShopNo(event.target.value)}
+          >
+            <option value="all">전체 쇼핑몰</option>
+            {shops.map((shop) => (
+              <option key={shop.shop_no} value={shop.shop_no}>
+                {shop.shop_name ?? `Shop ${shop.shop_no}`} ({shop.shop_no})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="controlGroup periodGroup">
+          <span className="controlLabel">주문일</span>
+          <div className="presetButtons" aria-label="주문일 기간 선택">
+            {DATE_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={
+                  datePreset === preset.id
+                    ? "presetButton isActive"
+                    : "presetButton"
+                }
+                onClick={() => applyPreset(preset.days, preset.id)}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div className="dateInputs">
+            <label className="dateField">
+              <span>시작</span>
+              <input
+                type="date"
+                value={dateRange.startDate}
+                onChange={(event) => {
+                  setDatePreset("custom");
+                  setDateRange((current) => ({
+                    ...current,
+                    startDate: event.target.value
+                  }));
+                }}
+              />
+            </label>
+            <label className="dateField">
+              <span>종료</span>
+              <input
+                type="date"
+                value={dateRange.endDate}
+                onChange={(event) => {
+                  setDatePreset("custom");
+                  setDateRange((current) => ({
+                    ...current,
+                    endDate: event.target.value
+                  }));
+                }}
+              />
+            </label>
+          </div>
+        </div>
       </section>
 
       <section className="summaryGrid">
