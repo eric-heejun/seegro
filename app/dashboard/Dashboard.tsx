@@ -38,6 +38,28 @@ function money(value: string | number | undefined) {
   return new Intl.NumberFormat("ko-KR").format(toNumber(value));
 }
 
+function getErrorMessage(payload: unknown, fallback: string) {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "error" in payload &&
+    typeof (payload as { error?: unknown }).error === "string"
+  ) {
+    return (payload as { error: string }).error;
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "error" in payload &&
+    (payload as { error?: unknown }).error
+  ) {
+    return JSON.stringify((payload as { error: unknown }).error);
+  }
+
+  return fallback;
+}
+
 export default function Dashboard() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [orders, setOrders] = useState<Cafe24Order[]>([]);
@@ -51,7 +73,7 @@ export default function Dashboard() {
         const response = await fetch("/api/cafe24/shops");
         const payload = await response.json();
         if (!response.ok) {
-          throw new Error(payload.error ?? "Cafe24 shops request failed");
+          throw new Error(getErrorMessage(payload, "Cafe24 shops request failed"));
         }
         setShops(Array.isArray(payload.shops) ? payload.shops : []);
       } catch (err) {
@@ -74,11 +96,20 @@ export default function Dashboard() {
         const response = await fetch(`/api/cafe24/orders?${params}`);
         const payload = await response.json();
         if (!response.ok) {
-          throw new Error(payload.error ?? "Cafe24 orders request failed");
+          throw new Error(getErrorMessage(payload, "Cafe24 orders request failed"));
         }
         setOrders(Array.isArray(payload.orders) ? payload.orders : []);
         if (Array.isArray(payload.shops) && payload.shops.length > 0) {
           setShops(payload.shops);
+        }
+        if (
+          Array.isArray(payload.errors) &&
+          payload.errors.length > 0 &&
+          (!Array.isArray(payload.orders) || payload.orders.length === 0)
+        ) {
+          setError(
+            `주문 조회 오류: ${JSON.stringify(payload.errors.slice(0, 3))}`
+          );
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");

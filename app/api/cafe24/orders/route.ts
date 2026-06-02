@@ -11,6 +11,8 @@ type Cafe24Shop = {
   primary_domain?: string;
 };
 
+const FALLBACK_SHOP_NOS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+
 function getDefaultDateRange() {
   const end = new Date();
   const start = new Date(end);
@@ -88,17 +90,12 @@ export async function GET(request: NextRequest) {
     const shopsResponse = await fetchAdmin("shops");
     const shopsPayload = await shopsResponse.json();
 
-    if (!shopsResponse.ok) {
-      const response = NextResponse.json(shopsPayload, {
-        status: shopsResponse.status
-      });
-      applyTokenCookies(response, refreshedToken);
-      return response;
-    }
-
-    shops = Array.isArray(shopsPayload.shops)
+    shops = shopsResponse.ok && Array.isArray(shopsPayload.shops)
       ? shopsPayload.shops
-      : [{ shop_no: 1, shop_name: "Default" }];
+      : FALLBACK_SHOP_NOS.map((shopNo) => ({
+          shop_no: shopNo,
+          shop_name: `Shop ${shopNo}`
+        }));
   } else {
     shops = [{ shop_no: Number(selectedShopNo) }];
   }
