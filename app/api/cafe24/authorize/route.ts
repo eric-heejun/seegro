@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const mallId =
     request.nextUrl.searchParams.get("mall_id") ??
     process.env.CAFE24_MALL_ID ??
-    "";
+    "sevenpet7";
 
   if (!mallId) {
     return NextResponse.json(

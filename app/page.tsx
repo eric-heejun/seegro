@@ -1,4 +1,4 @@
-const defaultMallId = process.env.CAFE24_MALL_ID ?? "";
+const defaultMallId = process.env.CAFE24_MALL_ID ?? "sevenpet7";
 
 export default function Home() {
   return (
