@@ -35,23 +35,28 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const connectedMallId = mallId;
+  let currentAccessToken = accessToken;
   let refreshedToken: Awaited<ReturnType<typeof refreshCafe24Token>> | null =
     null;
 
   async function fetchAdmin(path: string, searchParams?: URLSearchParams) {
     let response = await fetchCafe24Admin({
-      mallId,
-      accessToken: accessToken!,
+      mallId: connectedMallId,
+      accessToken: currentAccessToken,
       path,
       searchParams
     });
 
     if (response.status === 401 && refreshToken) {
-      refreshedToken = await refreshCafe24Token({ mallId, refreshToken });
-      accessToken = refreshedToken.access_token;
+      refreshedToken = await refreshCafe24Token({
+        mallId: connectedMallId,
+        refreshToken
+      });
+      currentAccessToken = refreshedToken.access_token;
       response = await fetchCafe24Admin({
-        mallId,
-        accessToken: accessToken!,
+        mallId: connectedMallId,
+        accessToken: currentAccessToken,
         path,
         searchParams
       });
@@ -127,7 +132,7 @@ export async function GET(request: NextRequest) {
   });
 
   const response = NextResponse.json({
-    mall_id: mallId,
+    mall_id: connectedMallId,
     shop_no: selectedShopNo,
     shops,
     orders,
