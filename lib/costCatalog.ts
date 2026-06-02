@@ -49,6 +49,8 @@ const NOISE_WORDS = new Set([
 ]);
 
 const SIZE_PATTERN = /(\d{2,3})\s*[*xX×]\s*(\d{2,3})/;
+const ROUND_SIZE_PATTERN =
+  /(?:(\d{2,3})\s*(?:cm)?\s*원형|원형\s*(\d{2,3})\s*(?:cm)?|(\d{2,3})\s*파이)/;
 const costGroups = costCatalogData as unknown as CostGroup[];
 
 export const COST_ENTRIES: CostEntry[] = costGroups
@@ -64,11 +66,16 @@ export const COST_ENTRIES: CostEntry[] = costGroups
 
 export function normalizeSize(value: string | undefined) {
   const match = value?.match(SIZE_PATTERN);
-  if (!match) {
-    return "";
+  if (match) {
+    return `${match[1]}*${match[2]}`;
   }
 
-  return `${match[1]}*${match[2]}`;
+  const roundMatch = value?.match(ROUND_SIZE_PATTERN);
+  if (roundMatch) {
+    return `${roundMatch[1] ?? roundMatch[2] ?? roundMatch[3]} 원형`;
+  }
+
+  return "";
 }
 
 function compactText(value: string) {
