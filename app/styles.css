@@ -199,6 +199,134 @@ h2 {
   font-size: 14px;
 }
 
+.dashboardShell {
+  width: min(1280px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0;
+}
+
+.dashboardTop,
+.dashboardControls,
+.summaryGrid {
+  margin-bottom: 16px;
+}
+
+.dashboardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dashboardControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboardControls label {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dashboardControls select {
+  min-width: 240px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 0 12px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.metric span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.metric strong {
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.errorBox {
+  border: 1px solid #f5c2c7;
+  border-radius: 8px;
+  margin: 0 0 16px;
+  background: #fff1f2;
+  color: #9f1239;
+  padding: 12px 14px;
+}
+
+.tableWrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 11px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #f7f9fa;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+td {
+  color: var(--ink);
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
 @media (max-width: 760px) {
   .topBar,
   .inputRow {
@@ -216,5 +344,17 @@ h2 {
 
   .inputRow button {
     width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboardTop,
+  .dashboardControls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .summaryGrid {
+    grid-template-columns: 1fr 1fr;
   }
 }

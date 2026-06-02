@@ -2,6 +2,15 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { fetchCafe24Admin, refreshCafe24Token } from "@/lib/cafe24";
 
+type Cafe24Shop = {
+  shop_no: number;
+  shop_name?: string;
+  default?: "T" | "F";
+  language_code?: string;
+  currency_code?: string;
+  primary_domain?: string;
+};
+
 function getDefaultDateRange() {
   const end = new Date();
   const start = new Date(end);
@@ -26,64 +35,138 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const defaults = getDefaultDateRange();
-  const params = new URLSearchParams();
-  params.set(
-    "start_date",
-    request.nextUrl.searchParams.get("start_date") ?? defaults.startDate
-  );
-  params.set(
-    "end_date",
-    request.nextUrl.searchParams.get("end_date") ?? defaults.endDate
-  );
-  params.set("limit", request.nextUrl.searchParams.get("limit") ?? "100");
-  params.set("embed", request.nextUrl.searchParams.get("embed") ?? "items");
-
-  let cafe24Response = await fetchCafe24Admin({
-    mallId,
-    accessToken,
-    path: "orders",
-    searchParams: params
-  });
-
   let refreshedToken: Awaited<ReturnType<typeof refreshCafe24Token>> | null =
     null;
 
-  if (cafe24Response.status === 401 && refreshToken) {
-    refreshedToken = await refreshCafe24Token({ mallId, refreshToken });
-    accessToken = refreshedToken.access_token;
-    cafe24Response = await fetchCafe24Admin({
+  async function fetchAdmin(path: string, searchParams?: URLSearchParams) {
+    let response = await fetchCafe24Admin({
       mallId,
-      accessToken,
-      path: "orders",
-      searchParams: params
+      accessToken: accessToken!,
+      path,
+      searchParams
     });
+
+    if (response.status === 401 && refreshToken) {
+      refreshedToken = await refreshCafe24Token({ mallId, refreshToken });
+      accessToken = refreshedToken.access_token;
+      response = await fetchCafe24Admin({
+        mallId,
+        accessToken,
+        path,
+        searchParams
+      });
+    }
+
+    return response;
   }
 
-  const payload = await cafe24Response.json();
-  const response = NextResponse.json(payload, {
-    status: cafe24Response.status
+  const defaults = getDefaultDateRange();
+  const selectedShopNo = request.nextUrl.searchParams.get("shop_no") ?? "all";
+  const baseParams = new URLSearchParams();
+  baseParams.set(
+    "start_date",
+    request.nextUrl.searchParams.get("start_date") ?? defaults.startDate
+  );
+  baseParams.set(
+    "end_date",
+    request.nextUrl.searchParams.get("end_date") ?? defaults.endDate
+  );
+  baseParams.set("limit", request.nextUrl.searchParams.get("limit") ?? "100");
+  baseParams.set(
+    "embed",
+    request.nextUrl.searchParams.get("embed") ?? "items"
+  );
+
+  let shops: Cafe24Shop[] = [];
+
+  if (selectedShopNo === "all") {
+    const shopsResponse = await fetchAdmin("shops");
+    const shopsPayload = await shopsResponse.json();
+
+    if (!shopsResponse.ok) {
+      const response = NextResponse.json(shopsPayload, {
+        status: shopsResponse.status
+      });
+      applyTokenCookies(response, refreshedToken);
+      return response;
+    }
+
+    shops = Array.isArray(shopsPayload.shops)
+      ? shopsPayload.shops
+      : [{ shop_no: 1, shop_name: "Default" }];
+  } else {
+    shops = [{ shop_no: Number(selectedShopNo) }];
+  }
+
+  const shopResults = await Promise.all(
+    shops.map(async (shop) => {
+      const params = new URLSearchParams(baseParams);
+      params.set("shop_no", String(shop.shop_no));
+      const ordersResponse = await fetchAdmin("orders", params);
+      const payload = await ordersResponse.json();
+
+      return {
+        shop,
+        ok: ordersResponse.ok,
+        status: ordersResponse.status,
+        payload
+      };
+    })
+  );
+
+  const orders = shopResults.flatMap((result) => {
+    if (!result.ok || !Array.isArray(result.payload.orders)) {
+      return [];
+    }
+
+    return result.payload.orders.map((order: Record<string, unknown>) => ({
+      ...order,
+      shop_no: order.shop_no ?? result.shop.shop_no,
+      shop_name: result.shop.shop_name
+    }));
   });
 
-  if (refreshedToken) {
-    response.cookies.set("cafe24_access_token", refreshedToken.access_token, {
+  const response = NextResponse.json({
+    mall_id: mallId,
+    shop_no: selectedShopNo,
+    shops,
+    orders,
+    errors: shopResults
+      .filter((result) => !result.ok)
+      .map((result) => ({
+        shop_no: result.shop.shop_no,
+        status: result.status,
+        payload: result.payload
+      }))
+  });
+  applyTokenCookies(response, refreshedToken);
+
+  return response;
+}
+
+function applyTokenCookies(
+  response: NextResponse,
+  refreshedToken: Awaited<ReturnType<typeof refreshCafe24Token>> | null
+) {
+  if (!refreshedToken) {
+    return;
+  }
+
+  response.cookies.set("cafe24_access_token", refreshedToken.access_token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: true,
+    path: "/",
+    maxAge: 60 * 60 * 2
+  });
+
+  if (refreshedToken.refresh_token) {
+    response.cookies.set("cafe24_refresh_token", refreshedToken.refresh_token, {
       httpOnly: true,
       sameSite: "lax",
       secure: true,
       path: "/",
-      maxAge: 60 * 60 * 2
+      maxAge: 60 * 60 * 24 * 30
     });
-
-    if (refreshedToken.refresh_token) {
-      response.cookies.set("cafe24_refresh_token", refreshedToken.refresh_token, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: true,
-        path: "/",
-        maxAge: 60 * 60 * 24 * 30
-      });
-    }
   }
-
-  return response;
 }

@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
             <section>
               <h1>Cafe24 연결 완료</h1>
               <p>${state.mall_id} 쇼핑몰 인증이 완료되었습니다.</p>
-              <p><a href="/api/cafe24/orders">주문 데이터 테스트</a></p>
+              <p><a href="/dashboard">주문 대시보드 열기</a></p>
             </section>
           </main>
         </body>
