@@ -127,6 +127,22 @@ function getOrderCost(order: Cafe24Order) {
   );
 }
 
+function getMarginRate(payment: number, margin: number) {
+  if (payment <= 0) {
+    return null;
+  }
+
+  return margin / payment;
+}
+
+function percent(value: number | null) {
+  if (value === null) {
+    return "-";
+  }
+
+  return `${(value * 100).toFixed(1)}%`;
+}
+
 function getOrderUnmatchedItemCount(order: Cafe24Order) {
   return (order.items ?? []).filter((item) => !getItemCostMatch(item)).length;
 }
@@ -425,21 +441,30 @@ export default function Dashboard() {
               <th>주문경로</th>
               <th>결제금액</th>
               <th>공급가</th>
+              <th>원가</th>
+              <th>마진</th>
+              <th>마진율</th>
               <th>상태</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8}>불러오는 중...</td>
+                <td colSpan={11}>불러오는 중...</td>
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={8}>조회된 주문이 없습니다.</td>
+                <td colSpan={11}>조회된 주문이 없습니다.</td>
               </tr>
             ) : (
               orders.map((order) => {
                   const orderCost = getOrderCost(order);
+                  const orderPayment = toNumber(order.payment_amount);
+                  const orderMargin = orderPayment - orderCost;
+                  const orderMarginRate = getMarginRate(
+                    orderPayment,
+                    orderMargin
+                  );
                   const unmatchedItems = getOrderUnmatchedItemCount(order);
 
                   return (
@@ -558,6 +583,26 @@ export default function Dashboard() {
                       <td>{order.order_place_id ?? order.order_place_name}</td>
                       <td>{money(order.payment_amount)}원</td>
                       <td>{money(order.total_supply_price)}원</td>
+                      <td>
+                        {orderCost > 0 ? (
+                          <>
+                            {money(orderCost)}원
+                            {unmatchedItems > 0 ? (
+                              <div className="cellNote">일부 미매칭</div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="mutedText">미등록</span>
+                        )}
+                      </td>
+                      <td
+                        className={
+                          orderMargin < 0 ? "negativeValue" : "positiveValue"
+                        }
+                      >
+                        {orderCost > 0 ? `${money(orderMargin)}원` : "-"}
+                      </td>
+                      <td>{orderCost > 0 ? percent(orderMarginRate) : "-"}</td>
                       <td>{order.canceled === "T" ? "취소" : "정상"}</td>
                     </tr>
                   );

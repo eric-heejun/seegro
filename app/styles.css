@@ -360,7 +360,7 @@ h2 {
 
 table {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1280px;
   border-collapse: collapse;
   font-size: 14px;
 }
@@ -496,6 +496,23 @@ tbody tr:last-child td {
 
 .mutedText {
   color: var(--muted);
+}
+
+.cellNote {
+  margin-top: 4px;
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.positiveValue {
+  color: #166534;
+  font-weight: 700;
+}
+
+.negativeValue {
+  color: #b91c1c;
+  font-weight: 700;
 }
 
 @media (max-width: 760px) {
