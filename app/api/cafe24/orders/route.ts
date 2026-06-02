@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       accessToken = refreshedToken.access_token;
       response = await fetchCafe24Admin({
         mallId,
-        accessToken,
+        accessToken: accessToken!,
         path,
         searchParams
       });
