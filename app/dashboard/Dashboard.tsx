@@ -12,8 +12,22 @@ type Shop = {
 };
 
 type Cafe24OrderItem = {
+  order_item_code?: string;
+  product_code?: string;
+  custom_product_code?: string;
   product_name?: string;
-  quantity?: number;
+  product_name_default?: string;
+  supplier_product_name?: string;
+  supplier_name?: string;
+  option_value?: string;
+  option_value_default?: string;
+  additional_option_value?: string;
+  actual_payment_amount?: string | number;
+  product_price?: string | number;
+  option_price?: string | number;
+  status_text?: string;
+  order_status?: string;
+  quantity?: string | number;
 };
 
 type Cafe24Order = {
@@ -45,6 +59,44 @@ function toNumber(value: string | number | undefined) {
 
 function money(value: string | number | undefined) {
   return new Intl.NumberFormat("ko-KR").format(toNumber(value));
+}
+
+function getQuantity(value: string | number | undefined) {
+  const quantity = toNumber(value);
+  return quantity > 0 ? quantity : 1;
+}
+
+function getItemName(item: Cafe24OrderItem) {
+  return (
+    item.product_name ??
+    item.product_name_default ??
+    item.supplier_product_name ??
+    "상품명 없음"
+  );
+}
+
+function getItemOption(item: Cafe24OrderItem) {
+  return (
+    item.option_value ??
+    item.option_value_default ??
+    item.additional_option_value ??
+    ""
+  );
+}
+
+function getItemCode(item: Cafe24OrderItem) {
+  return item.custom_product_code ?? item.product_code ?? item.order_item_code ?? "";
+}
+
+function getOrderItemQuantity(order: Cafe24Order) {
+  return (order.items ?? []).reduce(
+    (total, item) => total + getQuantity(item.quantity),
+    0
+  );
+}
+
+function needsCostReview(order: Cafe24Order) {
+  return toNumber(order.payment_amount) > toNumber(order.total_supply_price);
 }
 
 function getErrorMessage(payload: unknown, fallback: string) {
@@ -192,6 +244,10 @@ export default function Dashboard() {
     return {
       count: activeOrders.length,
       canceled: orders.length - activeOrders.length,
+      items: activeOrders.reduce(
+        (total, order) => total + getOrderItemQuantity(order),
+        0
+      ),
       payment: activeOrders.reduce(
         (total, order) => total + toNumber(order.payment_amount),
         0
@@ -289,6 +345,10 @@ export default function Dashboard() {
           <strong>{summary.count}</strong>
         </div>
         <div className="metric">
+          <span>구매 품목수</span>
+          <strong>{summary.items}</strong>
+        </div>
+        <div className="metric">
           <span>결제금액</span>
           <strong>{money(summary.payment)}원</strong>
         </div>
@@ -311,7 +371,7 @@ export default function Dashboard() {
               <th>쇼핑몰</th>
               <th>주문일</th>
               <th>주문번호</th>
-              <th>상품</th>
+              <th>구매 품목 전체</th>
               <th>주문경로</th>
               <th>결제금액</th>
               <th>공급가</th>
@@ -334,10 +394,67 @@ export default function Dashboard() {
                   <td>{order.order_date?.slice(0, 10)}</td>
                   <td>{order.order_id}</td>
                   <td>
-                    {(order.items ?? [])
-                      .map((item) => item.product_name)
-                      .filter(Boolean)
-                      .join(", ")}
+                    {order.items && order.items.length > 0 ? (
+                      <div className="orderItems">
+                        <div className="orderItemsSummary">
+                          <span>{order.items.length}개 품목</span>
+                          <span>총 {getOrderItemQuantity(order)}개</span>
+                          {needsCostReview(order) ? (
+                            <span className="reviewBadge">원가 확인</span>
+                          ) : null}
+                        </div>
+                        <ul>
+                          {order.items.map((item, index) => {
+                            const option = getItemOption(item);
+                            const code = getItemCode(item);
+
+                            return (
+                              <li
+                                key={
+                                  item.order_item_code ??
+                                  `${order.order_id}-${index}`
+                                }
+                              >
+                                <div className="itemName">{getItemName(item)}</div>
+                                {option ? (
+                                  <div className="itemOption">{option}</div>
+                                ) : null}
+                                <div className="itemMeta">
+                                  <span>수량 {getQuantity(item.quantity)}개</span>
+                                  {item.actual_payment_amount !== undefined ? (
+                                    <span>
+                                      품목결제 {money(item.actual_payment_amount)}원
+                                    </span>
+                                  ) : null}
+                                  {item.product_price !== undefined ? (
+                                    <span>
+                                      상품가 {money(item.product_price)}원
+                                    </span>
+                                  ) : null}
+                                  {item.option_price !== undefined &&
+                                  toNumber(item.option_price) !== 0 ? (
+                                    <span>
+                                      옵션가 {money(item.option_price)}원
+                                    </span>
+                                  ) : null}
+                                  {item.supplier_name ? (
+                                    <span>{item.supplier_name}</span>
+                                  ) : null}
+                                  {code ? <span>{code}</span> : null}
+                                  {item.status_text ?? item.order_status ? (
+                                    <span>
+                                      {item.status_text ?? item.order_status}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : (
+                      <span className="mutedText">품목 정보 없음</span>
+                    )}
                   </td>
                   <td>{order.order_place_id ?? order.order_place_name}</td>
                   <td>{money(order.payment_amount)}원</td>
