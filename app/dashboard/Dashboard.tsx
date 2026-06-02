@@ -114,14 +114,16 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    async function loadOrders() {
-      if (dateRange.startDate > dateRange.endDate) {
-        setOrders([]);
-        setLoading(false);
-        setError("시작일은 종료일보다 늦을 수 없습니다.");
-        return;
-      }
+    if (dateRange.startDate > dateRange.endDate) {
+      setOrders([]);
+      setLoading(false);
+      setError("시작일은 종료일보다 늦을 수 없습니다.");
+      return;
+    }
 
+    const controller = new AbortController();
+
+    async function loadOrders() {
       setLoading(true);
       setError("");
       try {
@@ -132,8 +134,13 @@ export default function Dashboard() {
           limit: "100",
           max_pages: "10"
         });
-        const response = await fetch(`/api/cafe24/orders?${params}`);
+        const response = await fetch(`/api/cafe24/orders?${params}`, {
+          signal: controller.signal
+        });
         const payload = await response.json();
+        if (controller.signal.aborted) {
+          return;
+        }
         if (!response.ok) {
           throw new Error(getErrorMessage(payload, "Cafe24 orders request failed"));
         }
@@ -151,13 +158,20 @@ export default function Dashboard() {
           );
         }
       } catch (err) {
+        if (controller.signal.aborted) {
+          return;
+        }
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     loadOrders();
+
+    return () => controller.abort();
   }, [shopNo, dateRange.startDate, dateRange.endDate]);
 
   function applyPreset(days: number, presetId: DatePresetId) {
