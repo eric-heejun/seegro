@@ -1,11 +1,4 @@
-import costCatalogData from "./costCatalogData.json";
-
-type CostGroup = {
-  name: string;
-  aliases?: string[];
-  sizes: [string, number][];
-  needsReview?: boolean;
-};
+import { COST_CATALOG_DATA } from "./costCatalogData";
 
 export type CostEntry = {
   standardName: string;
@@ -51,9 +44,8 @@ const NOISE_WORDS = new Set([
 const SIZE_PATTERN = /(\d{2,3})\s*[*xX×]\s*(\d{2,3})/;
 const ROUND_SIZE_PATTERN =
   /(?:(\d{2,3})\s*(?:cm)?\s*원형|원형\s*(\d{2,3})\s*(?:cm)?|(\d{2,3})\s*파이)/;
-const costGroups = costCatalogData as unknown as CostGroup[];
 
-export const COST_ENTRIES: CostEntry[] = costGroups
+export const COST_ENTRIES: CostEntry[] = COST_CATALOG_DATA
   .flatMap((group) =>
     group.sizes.map(([optionName, unitCost]) => ({
       standardName: group.name,

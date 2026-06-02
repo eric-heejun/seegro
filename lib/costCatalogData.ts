@@ -1,4 +1,11 @@
-[
+export type CostGroup = {
+  name: string;
+  aliases?: string[];
+  sizes: [string, number][];
+  needsReview?: boolean;
+};
+
+export const COST_CATALOG_DATA: CostGroup[] = [
   {
     "name": "레이지데이 방수 러그 사각형",
     "aliases": [
@@ -641,4 +648,4 @@
     ],
     "needsReview": false
   }
-]
+];
