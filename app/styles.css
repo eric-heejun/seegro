@@ -467,6 +467,33 @@ tbody tr:last-child td {
   overflow-wrap: anywhere;
 }
 
+.itemMeta .costBadge {
+  background: #e8f7f4;
+  color: var(--accent-strong);
+}
+
+.itemMeta .marginBadge {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.itemMeta .matchBadge {
+  background: #ecfdf3;
+  color: #166534;
+}
+
+.itemMeta .unmatchedBadge,
+.orderItemsSummary .unmatchedBadge {
+  border-color: #f7c873;
+  background: #fff7e6;
+  color: var(--warn);
+}
+
+.itemMeta .reviewBadge {
+  background: #fff7e6;
+  color: var(--warn);
+}
+
 .mutedText {
   color: var(--muted);
 }
