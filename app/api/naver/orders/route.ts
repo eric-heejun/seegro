@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchNaverCommerce, getNaverAccessToken } from "@/lib/naver";
+import {
+  fetchNaverCommerce,
+  fetchNaverCommerceProxy,
+  getNaverAccessToken
+} from "@/lib/naver";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -200,6 +204,24 @@ function toDashboardOrders(contents: NaverProductOrderContent[]) {
     .sort((a, b) => String(b.order_date ?? "").localeCompare(String(a.order_date ?? "")));
 }
 
+async function fetchProductOrders(params: URLSearchParams) {
+  const proxiedResponse = await fetchNaverCommerceProxy({
+    path: "pay-order/seller/product-orders",
+    searchParams: params
+  });
+
+  if (proxiedResponse) {
+    return proxiedResponse;
+  }
+
+  const token = await getNaverAccessToken();
+  return fetchNaverCommerce({
+    accessToken: token.access_token,
+    path: "pay-order/seller/product-orders",
+    searchParams: params
+  });
+}
+
 export async function GET(request: NextRequest) {
   const defaults = getDefaultDateRange();
   const startDate = request.nextUrl.searchParams.get("start_date") ?? defaults.startDate;
@@ -212,7 +234,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const token = await getNaverAccessToken();
     const contents: NaverProductOrderContent[] = [];
 
     for (const day of days) {
@@ -221,11 +242,7 @@ export async function GET(request: NextRequest) {
         to: formatKstDateTime(day, true),
         rangeType
       });
-      const naverResponse = await fetchNaverCommerce({
-        accessToken: token.access_token,
-        path: "pay-order/seller/product-orders",
-        searchParams: params
-      });
+      const naverResponse = await fetchProductOrders(params);
       const payload = await naverResponse.json();
 
       if (!naverResponse.ok) {
