@@ -77,12 +77,13 @@ function getItemName(item: Cafe24OrderItem) {
 }
 
 function getItemOption(item: Cafe24OrderItem) {
-  return (
-    item.option_value ??
-    item.option_value_default ??
-    item.additional_option_value ??
-    ""
-  );
+  const optionParts = [
+    item.option_value,
+    item.option_value_default,
+    item.additional_option_value
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  return Array.from(new Set(optionParts)).join(", ");
 }
 
 function getItemCode(item: Cafe24OrderItem) {
