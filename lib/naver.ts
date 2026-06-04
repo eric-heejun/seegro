@@ -102,3 +102,33 @@ export async function fetchNaverCommerce({
     }
   });
 }
+
+export async function fetchNaverCommerceProxy({
+  path,
+  searchParams
+}: {
+  path: string;
+  searchParams?: URLSearchParams;
+}) {
+  const proxyBaseUrl = process.env.NAVER_COMMERCE_PROXY_URL;
+  if (!proxyBaseUrl) {
+    return null;
+  }
+
+  const url = new URL("/naver/product-orders", proxyBaseUrl);
+  url.searchParams.set("path", path);
+  searchParams?.forEach((value, key) => url.searchParams.append(key, value));
+
+  const headers: HeadersInit = {
+    "Content-Type": "application/json"
+  };
+  const proxySecret = process.env.NAVER_COMMERCE_PROXY_SECRET;
+  if (proxySecret) {
+    headers["x-seegro-proxy-secret"] = proxySecret;
+  }
+
+  return fetch(url, {
+    cache: "no-store",
+    headers
+  });
+}
