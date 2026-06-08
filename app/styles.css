@@ -331,6 +331,11 @@ h2 {
   padding: 16px;
 }
 
+.adSpendMetric {
+  border-color: #99d8cf;
+  background: #f0fbf8;
+}
+
 .metric span {
   color: var(--muted);
   font-size: 13px;

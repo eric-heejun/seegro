@@ -44,6 +44,16 @@ type Cafe24Order = {
   items?: Cafe24OrderItem[];
 };
 
+type MetaAdsSummary = {
+  spend: number;
+  impressions: number;
+  reach: number;
+  clicks: number;
+  ctr: number | null;
+  cpc: number | null;
+  cpm: number | null;
+};
+
 const DATE_PRESETS = [
   { id: "today", label: "오늘", days: 1 },
   { id: "7d", label: "최근 7일", days: 7 },
@@ -53,7 +63,7 @@ const DATE_PRESETS = [
 
 type DatePresetId = (typeof DATE_PRESETS)[number]["id"] | "custom";
 
-function toNumber(value: string | number | undefined) {
+function toNumber(value: unknown) {
   const numberValue = Number(value ?? 0);
   return Number.isFinite(numberValue) ? numberValue : 0;
 }
@@ -148,26 +158,68 @@ function getOrderUnmatchedItemCount(order: Cafe24Order) {
   return (order.items ?? []).filter((item) => !getItemCostMatch(item)).length;
 }
 
+function asRecord(value: unknown) {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getStringField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function getPayloadErrorMessage(payload: unknown): string {
+  const record = asRecord(payload);
+  if (!record) {
+    return typeof payload === "string" ? payload : "";
+  }
+
+  const directParts = [
+    getStringField(record, "code"),
+    getStringField(record, "errorCode"),
+    getStringField(record, "error"),
+    getStringField(record, "message"),
+    getStringField(record, "error_description")
+  ].filter(Boolean);
+  const directMessage = Array.from(new Set(directParts)).join(" - ");
+  const nestedPayloadMessage = getPayloadErrorMessage(record.payload);
+  const nestedDataMessage = getPayloadErrorMessage(record.data);
+  const nestedMessage = nestedPayloadMessage || nestedDataMessage;
+
+  if (directMessage && nestedMessage && nestedMessage !== directMessage) {
+    return `${directMessage}: ${nestedMessage}`;
+  }
+
+  if (directMessage || nestedMessage) {
+    return directMessage || nestedMessage;
+  }
+
+  if (Array.isArray(record.errors) && record.errors.length > 0) {
+    return JSON.stringify(record.errors.slice(0, 3));
+  }
+
+  return "";
+}
+
 function getErrorMessage(payload: unknown, fallback: string) {
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "error" in payload &&
-    typeof (payload as { error?: unknown }).error === "string"
-  ) {
-    return (payload as { error: string }).error;
+  return getPayloadErrorMessage(payload) || fallback;
+}
+
+async function readJsonResponse(response: Response) {
+  const text = await response.text();
+  if (!text) {
+    return {};
   }
 
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "error" in payload &&
-    (payload as { error?: unknown }).error
-  ) {
-    return JSON.stringify((payload as { error: unknown }).error);
+  try {
+    const payload = JSON.parse(text) as unknown;
+    return asRecord(payload) ?? { error: String(payload) };
+  } catch {
+    return {
+      error: text.trim() || `${response.status} ${response.statusText}`.trim()
+    };
   }
-
-  return fallback;
 }
 
 function formatDateInput(date: Date) {
@@ -196,12 +248,15 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState(() => getPresetRange(7));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [adSummary, setAdSummary] = useState<MetaAdsSummary | null>(null);
+  const [adLoading, setAdLoading] = useState(true);
+  const [adError, setAdError] = useState("");
 
   useEffect(() => {
     async function loadShops() {
       try {
         const response = await fetch("/api/cafe24/shops");
-        const payload = await response.json();
+        const payload = await readJsonResponse(response);
         if (!response.ok) {
           throw new Error(getErrorMessage(payload, "Cafe24 shops request failed"));
         }
@@ -238,7 +293,7 @@ export default function Dashboard() {
         const response = await fetch(`/api/cafe24/orders?${params}`, {
           signal: controller.signal
         });
-        const payload = await response.json();
+        const payload = await readJsonResponse(response);
         if (controller.signal.aborted) {
           return;
         }
@@ -274,6 +329,77 @@ export default function Dashboard() {
 
     return () => controller.abort();
   }, [shopNo, dateRange.startDate, dateRange.endDate]);
+
+  useEffect(() => {
+    if (dateRange.startDate > dateRange.endDate) {
+      setAdSummary(null);
+      setAdLoading(false);
+      setAdError("");
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadAdInsights() {
+      setAdLoading(true);
+      setAdError("");
+      try {
+        const params = new URLSearchParams({
+          start_date: dateRange.startDate,
+          end_date: dateRange.endDate,
+          level: "campaign"
+        });
+        const response = await fetch(`/api/meta/ads/insights?${params}`, {
+          signal: controller.signal
+        });
+        const payload = await readJsonResponse(response);
+        if (controller.signal.aborted) {
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(getErrorMessage(payload, "Meta ads request failed"));
+        }
+
+        const summaryPayload = asRecord(payload.summary);
+        setAdSummary(
+          summaryPayload
+            ? {
+                spend: toNumber(summaryPayload.spend),
+                impressions: toNumber(summaryPayload.impressions),
+                reach: toNumber(summaryPayload.reach),
+                clicks: toNumber(summaryPayload.clicks),
+                ctr:
+                  summaryPayload.ctr === null
+                    ? null
+                    : toNumber(summaryPayload.ctr),
+                cpc:
+                  summaryPayload.cpc === null
+                    ? null
+                    : toNumber(summaryPayload.cpc),
+                cpm:
+                  summaryPayload.cpm === null
+                    ? null
+                    : toNumber(summaryPayload.cpm)
+              }
+            : null
+        );
+      } catch (err) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setAdSummary(null);
+        setAdError(err instanceof Error ? err.message : "Unknown error");
+      } finally {
+        if (!controller.signal.aborted) {
+          setAdLoading(false);
+        }
+      }
+    }
+
+    loadAdInsights();
+
+    return () => controller.abort();
+  }, [dateRange.startDate, dateRange.endDate]);
 
   function applyPreset(days: number, presetId: DatePresetId) {
     setDatePreset(presetId);
@@ -313,6 +439,21 @@ export default function Dashboard() {
     };
   }, [orders]);
   const summaryMargin = summary.payment - summary.cost;
+  const adSpend = adSummary?.spend ?? 0;
+  const hasAdSpend = Boolean(adSummary) && !adError;
+  const adSpendLabel = adLoading
+    ? "조회 중"
+    : hasAdSpend
+      ? `${money(adSpend)}원`
+      : "조회 실패";
+  const summaryMarginAfterAds = hasAdSpend
+    ? summaryMargin - adSpend
+    : summaryMargin;
+  const summaryMarginAfterAdsLabel = adLoading
+    ? "조회 중"
+    : hasAdSpend
+      ? `${money(summaryMarginAfterAds)}원`
+      : "-";
 
   return (
     <main className="dashboardShell">
@@ -419,6 +560,24 @@ export default function Dashboard() {
           <span>예상마진</span>
           <strong>{money(summaryMargin)}원</strong>
         </div>
+        <div className="metric adSpendMetric">
+          <span>Meta 광고비 지출총액</span>
+          <strong>{adSpendLabel}</strong>
+        </div>
+        <div className="metric">
+          <span>광고 후 마진</span>
+          <strong
+            className={
+              hasAdSpend
+                ? summaryMarginAfterAds < 0
+                  ? "negativeValue"
+                  : "positiveValue"
+                : undefined
+            }
+          >
+            {summaryMarginAfterAdsLabel}
+          </strong>
+        </div>
         <div className="metric">
           <span>원가 미매칭</span>
           <strong>{summary.unmatchedItems}</strong>
@@ -430,6 +589,7 @@ export default function Dashboard() {
       </section>
 
       {error ? <p className="errorBox">{error}</p> : null}
+      {adError ? <p className="errorBox">Meta 광고비 조회 오류: {adError}</p> : null}
 
       <section className="tableWrap">
         <table>

@@ -16,6 +16,9 @@ APP_URL
 NAVER_COMMERCE_CLIENT_ID
 NAVER_COMMERCE_CLIENT_SECRET
 NAVER_COMMERCE_TOKEN_TYPE
+META_ACCESS_TOKEN
+META_AD_ACCOUNT_ID
+META_GRAPH_API_VERSION
 NAVER_COMMERCE_PROXY_URL
 NAVER_COMMERCE_PROXY_SECRET
 ```
@@ -23,6 +26,10 @@ NAVER_COMMERCE_PROXY_SECRET
 For Naver Commerce API, use `NAVER_COMMERCE_TOKEN_TYPE=SELF` for the app owner's own store. In `SELF` mode, do not set `NAVER_COMMERCE_ACCOUNT_ID`. Use `SELLER` and set `NAVER_COMMERCE_ACCOUNT_ID` only when calling another seller store with the seller account ID/UID required by Naver.
 
 If Naver blocks Vercel with `GW.IP_NOT_ALLOWED`, run the proxy on a server whose IP is registered in Naver Commerce API Center and set `NAVER_COMMERCE_PROXY_URL` in Vercel. Set the same secret in Vercel as `NAVER_COMMERCE_PROXY_SECRET` and on the proxy server as `SEEGRO_PROXY_SECRET`.
+
+Meta ads spend is read from `/api/meta/ads/insights` and shown in the dashboard
+for the selected date range. Use a Meta access token with ad account read
+permission and set `META_AD_ACCOUNT_ID` with the `act_` prefix.
 
 ```bash
 npm install --omit=dev

@@ -4,6 +4,7 @@
 .next
 .vercel
 node_modules
+.tools/
 dist
 out
 outputs/
