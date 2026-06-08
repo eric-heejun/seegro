@@ -5,6 +5,10 @@ import {
   exchangeCodeForToken,
   getRedirectUri
 } from "@/lib/cafe24";
+import {
+  isCafe24TokenStoreConfigured,
+  trySaveCafe24Token
+} from "@/lib/cafe24TokenStore";
 
 type Cafe24OAuthState = {
   mall_id: string;
@@ -39,6 +43,13 @@ export async function GET(request: NextRequest) {
     mallId: state.mall_id,
     redirectUri: getRedirectUri(request.url)
   });
+
+  if (isCafe24TokenStoreConfigured()) {
+    await trySaveCafe24Token({
+      mallId: state.mall_id,
+      token
+    });
+  }
 
   const response = new NextResponse(
     `<!doctype html>

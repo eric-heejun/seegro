@@ -1,6 +1,14 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { fetchCafe24Admin, refreshCafe24Token } from "@/lib/cafe24";
+import {
+  Cafe24TokenResponse,
+  fetchCafe24Admin,
+  refreshCafe24Token
+} from "@/lib/cafe24";
+import {
+  tryGetStoredCafe24Token,
+  trySaveCafe24Token
+} from "@/lib/cafe24TokenStore";
 
 type Cafe24Shop = {
   shop_no: number;
@@ -26,9 +34,14 @@ function getDefaultDateRange() {
 
 export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
-  const mallId = cookieStore.get("cafe24_mall_id")?.value;
-  let accessToken = cookieStore.get("cafe24_access_token")?.value;
-  const refreshToken = cookieStore.get("cafe24_refresh_token")?.value;
+  const cookieMallId = cookieStore.get("cafe24_mall_id")?.value;
+  const cookieAccessToken = cookieStore.get("cafe24_access_token")?.value;
+  const storedToken =
+    cookieMallId && cookieAccessToken ? null : await tryGetStoredCafe24Token();
+  const mallId = cookieMallId ?? storedToken?.mallId;
+  const accessToken = cookieAccessToken ?? storedToken?.accessToken;
+  const refreshToken =
+    cookieStore.get("cafe24_refresh_token")?.value ?? storedToken?.refreshToken;
 
   if (!mallId || !accessToken) {
     return NextResponse.json(
@@ -41,6 +54,20 @@ export async function GET(request: NextRequest) {
   let currentAccessToken = accessToken;
   let refreshedToken: Awaited<ReturnType<typeof refreshCafe24Token>> | null =
     null;
+  let refreshPromise: Promise<Cafe24TokenResponse> | null = null;
+
+  async function refreshOnce() {
+    if (!refreshToken) {
+      return null;
+    }
+
+    refreshPromise ??= refreshCafe24Token({
+      mallId: connectedMallId,
+      refreshToken
+    });
+
+    return refreshPromise;
+  }
 
   async function fetchAdmin(path: string, searchParams?: URLSearchParams) {
     let response = await fetchCafe24Admin({
@@ -51,11 +78,17 @@ export async function GET(request: NextRequest) {
     });
 
     if (response.status === 401 && refreshToken) {
-      refreshedToken = await refreshCafe24Token({
-        mallId: connectedMallId,
-        refreshToken
-      });
+      refreshedToken = await refreshOnce();
+      if (!refreshedToken) {
+        return response;
+      }
+
       currentAccessToken = refreshedToken.access_token;
+      await trySaveCafe24Token({
+        mallId: connectedMallId,
+        token: refreshedToken,
+        previousRefreshToken: refreshToken
+      });
       response = await fetchCafe24Admin({
         mallId: connectedMallId,
         accessToken: currentAccessToken,

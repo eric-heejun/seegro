@@ -12,6 +12,9 @@ CAFE24_CLIENT_SECRET
 CAFE24_MALL_ID
 CAFE24_REDIRECT_URI
 CAFE24_SCOPES
+KV_REST_API_URL
+KV_REST_API_TOKEN
+CAFE24_TOKEN_STORE_KEY
 APP_URL
 NAVER_COMMERCE_CLIENT_ID
 NAVER_COMMERCE_CLIENT_SECRET
@@ -30,6 +33,13 @@ If Naver blocks Vercel with `GW.IP_NOT_ALLOWED`, run the proxy on a server whose
 Meta ads spend is read from `/api/meta/ads/insights` and shown in the dashboard
 for the selected date range. Use a Meta access token with ad account read
 permission and set `META_AD_ACCOUNT_ID` with the `act_` prefix.
+
+Cafe24 OAuth tokens are stored in browser cookies by default. To make the
+dashboard work across computers and allow scheduled jobs to read Cafe24 orders,
+connect Upstash Redis to the Vercel project so `KV_REST_API_URL` and
+`KV_REST_API_TOKEN` are available. After Redis is connected, run the Cafe24
+authorization flow once from the production app. `CAFE24_TOKEN_STORE_KEY` is
+optional and defaults to `seegro:cafe24:token`.
 
 ```bash
 npm install --omit=dev
