@@ -1299,7 +1299,10 @@ function scoreEntry(input: MatchInput, entry: CostEntry): CostMatch | null {
   let bestReason: CostMatch["reason"] = "similar";
 
   candidates.forEach((candidate, index) => {
-    const rawScore = getNameScore(productName, candidate);
+    const rawScore = Math.max(
+      getNameScore(productName, candidate),
+      getNameScore(optionName, candidate)
+    );
     const score =
       index === 0 && rawScore > 0 && rawScore < 1
         ? Math.min(1, rawScore + 0.02)
