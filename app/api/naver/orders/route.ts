@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   fetchNaverCommerce,
   fetchNaverCommerceProxy,
-  getNaverAccessToken
+  getNaverAccessToken,
+  getNaverEnvironmentStatus,
+  getNaverErrorMessage,
+  getNaverPayloadMessage
 } from "@/lib/naver";
 
 export const runtime = "nodejs";
@@ -69,6 +72,19 @@ function getDateRangeDays(startDate: string, endDate: string) {
   }
 
   return days;
+}
+
+async function readJsonPayload(response: Response) {
+  const text = await response.text();
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return { message: text };
+  }
 }
 
 function extractContents(payload: unknown): NaverProductOrderContent[] {
@@ -222,6 +238,11 @@ async function fetchProductOrders(params: URLSearchParams) {
   });
 }
 
+function buildPayloadError(payload: unknown, fallback: string) {
+  const payloadMessage = getNaverPayloadMessage(payload);
+  return getNaverErrorMessage(payloadMessage || JSON.stringify(payload), fallback);
+}
+
 export async function GET(request: NextRequest) {
   const defaults = getDefaultDateRange();
   const startDate = request.nextUrl.searchParams.get("start_date") ?? defaults.startDate;
@@ -231,6 +252,21 @@ export async function GET(request: NextRequest) {
 
   if (days.length === 0) {
     return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
+  }
+
+  const envStatus = getNaverEnvironmentStatus();
+  if (!envStatus.readyForProxyCall) {
+    return NextResponse.json(
+      {
+        error: "네이버 연결 설정이 필요합니다.",
+        message: envStatus.proxyUrlConfigured
+          ? "네이버 커머스 API 키 설정을 확인해주세요."
+          : "네이버 고정 IP 프록시 주소를 설정해주세요.",
+        issues: envStatus.issues,
+        status: envStatus
+      },
+      { status: 428 }
+    );
   }
 
   try {
@@ -243,11 +279,15 @@ export async function GET(request: NextRequest) {
         rangeType
       });
       const naverResponse = await fetchProductOrders(params);
-      const payload = await naverResponse.json();
+      const payload = await readJsonPayload(naverResponse);
 
       if (!naverResponse.ok) {
         return NextResponse.json(
-          { error: "Naver orders request failed", payload },
+          {
+            error: buildPayloadError(payload, "네이버 주문 조회에 실패했습니다."),
+            detail: getNaverPayloadMessage(payload),
+            payload
+          },
           { status: naverResponse.status }
         );
       }
@@ -263,7 +303,12 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: getNaverErrorMessage(
+          error,
+          "네이버 주문 조회 중 알 수 없는 오류가 발생했습니다."
+        )
+      },
       { status: 500 }
     );
   }
