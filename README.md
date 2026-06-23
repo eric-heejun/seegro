@@ -30,6 +30,24 @@ For Naver Commerce API, use `NAVER_COMMERCE_TOKEN_TYPE=SELF` for the app owner's
 
 If Naver blocks Vercel with `GW.IP_NOT_ALLOWED`, run the proxy on a server whose IP is registered in Naver Commerce API Center and set `NAVER_COMMERCE_PROXY_URL` in Vercel. Set the same secret in Vercel as `NAVER_COMMERCE_PROXY_SECRET` and on the proxy server as `SEEGRO_PROXY_SECRET`.
 
+### Naver connection checklist
+
+1. Create or check the app in Naver Commerce API Center.
+2. Set the app to the owner's own Smart Store and use `NAVER_COMMERCE_TOKEN_TYPE=SELF`.
+3. Prepare one fixed-IP server and register that server IP in Naver Commerce API Center.
+4. Run the Seegro proxy on that fixed-IP server.
+5. Set `NAVER_COMMERCE_PROXY_URL` and `NAVER_COMMERCE_PROXY_SECRET` in Vercel.
+6. Open `/naver-dashboard` and use the connection status cards and connection test button.
+
+The Naver dashboard also exposes these internal checks:
+
+```text
+GET /api/naver/status
+POST /api/naver/test
+```
+
+These endpoints never return the API client secret. They only show whether required settings exist, whether the fixed-IP proxy health check works, and whether a short order lookup succeeds.
+
 Meta ads spend is read from `/api/meta/ads/insights` and shown in the dashboard
 for the selected date range. Use a Meta access token with ad account read
 permission and set `META_AD_ACCOUNT_ID` with the `act_` prefix.
