@@ -10,6 +10,8 @@ export type InsightOrderItem = {
   option_value_default?: string;
   additional_option_value?: string;
   actual_payment_amount?: string | number;
+  product_price?: string | number;
+  option_price?: string | number;
   quantity?: string | number;
 };
 
@@ -119,8 +121,55 @@ function getProductLabel(product: ProductInsight) {
     : product.productName;
 }
 
-function getItemRevenue(item: InsightOrderItem) {
-  return toNumber(item.actual_payment_amount);
+function getItemPriceWeight(item: InsightOrderItem) {
+  const price = toNumber(item.product_price) + toNumber(item.option_price);
+  return price > 0 ? price * getQuantity(item.quantity) : 0;
+}
+
+function allocateAmount(total: number, weights: number[]) {
+  if (weights.length === 0) {
+    return [];
+  }
+
+  const roundedTotal = Math.round(total);
+  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
+  const safeWeights =
+    weightTotal > 0 ? weights : weights.map(() => 1);
+  const safeWeightTotal = safeWeights.reduce((sum, weight) => sum + weight, 0);
+  let remaining = roundedTotal;
+
+  return safeWeights.map((weight, index) => {
+    if (index === safeWeights.length - 1) {
+      return remaining;
+    }
+
+    const amount = Math.round((roundedTotal * weight) / safeWeightTotal);
+    remaining -= amount;
+    return amount;
+  });
+}
+
+function getOrderItemRevenues(order: InsightOrder) {
+  const items = order.items ?? [];
+  const orderPayment = toNumber(order.payment_amount);
+  const directRevenues = items.map((item) => toNumber(item.actual_payment_amount));
+  const directRevenueTotal = directRevenues.reduce(
+    (sum, revenue) => sum + revenue,
+    0
+  );
+
+  if (directRevenueTotal > 0) {
+    if (orderPayment > 0 && Math.round(directRevenueTotal) !== Math.round(orderPayment)) {
+      return allocateAmount(orderPayment, directRevenues);
+    }
+
+    return directRevenues;
+  }
+
+  return allocateAmount(
+    orderPayment,
+    items.map((item) => getItemPriceWeight(item))
+  );
 }
 
 function serializeProduct(product: ProductAccumulator): ProductInsight {
@@ -159,14 +208,15 @@ export function buildDailyInsightReport({
 
   for (const order of activeOrders) {
     const orderItems = order.items ?? [];
+    const orderItemRevenues = getOrderItemRevenues(order);
     const orderProducts = new Map<string, ProductInsight>();
 
-    for (const item of orderItems) {
+    for (const [index, item] of orderItems.entries()) {
       const productName = getItemName(item);
       const optionName = getItemOption(item);
       const key = getProductKey(productName, optionName);
       const quantity = getQuantity(item.quantity);
-      const revenue = getItemRevenue(item);
+      const revenue = orderItemRevenues[index] ?? 0;
       const costMatch = matchCostEntry({ productName, optionName });
       const cost = costMatch ? costMatch.entry.unitCost * quantity : 0;
       let product = products.get(key);
