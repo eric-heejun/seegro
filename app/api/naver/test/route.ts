@@ -17,7 +17,7 @@ function getStringField(record: Record<string, unknown>, key: string) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
-function getPayloadMessage(payload: unknown) {
+function getPayloadMessage(payload: unknown): string {
   if (!payload || typeof payload !== "object") {
     return typeof payload === "string" ? payload : "";
   }
