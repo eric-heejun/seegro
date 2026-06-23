@@ -39,7 +39,7 @@ export function isCafe24TokenStoreConfigured() {
   return Boolean(getTokenStoreConfig());
 }
 
-async function redisCommand<T>(command: unknown[]) {
+export async function redisCommand<T>(command: unknown[]) {
   const config = getTokenStoreConfig();
   if (!config) {
     return null;

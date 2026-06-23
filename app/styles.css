@@ -520,6 +520,94 @@ tbody tr:last-child td {
   font-weight: 700;
 }
 
+.insightSection {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.insightHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.insightHeader p:not(.eyebrow) {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.insightHeader button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.insightSummaryGrid,
+.insightGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.insightSummaryGrid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.insightGrid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.insightPanel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f9fa;
+  padding: 14px;
+}
+
+.insightPanel h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.insightList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.insightList li {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.insightList li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.insightList span {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.insightList strong {
+  color: var(--accent-strong);
+  font-size: 13px;
+}
+
 @media (max-width: 760px) {
   .topBar,
   .inputRow {

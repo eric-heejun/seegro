@@ -1,6 +1,7 @@
 "use client";
 
 import { matchCostEntry } from "@/lib/costCatalog";
+import type { DailyInsightReport, ProductInsight } from "@/lib/insights";
 import { useEffect, useMemo, useState } from "react";
 
 type Shop = {
@@ -52,6 +53,14 @@ type MetaAdsSummary = {
   ctr: number | null;
   cpc: number | null;
   cpm: number | null;
+};
+
+type DailyInsightResponse = {
+  report?: DailyInsightReport;
+  cached?: boolean;
+  stored?: boolean;
+  rebuilt?: boolean;
+  error?: string;
 };
 
 const DATE_PRESETS = [
@@ -251,6 +260,14 @@ export default function Dashboard() {
   const [adSummary, setAdSummary] = useState<MetaAdsSummary | null>(null);
   const [adLoading, setAdLoading] = useState(true);
   const [adError, setAdError] = useState("");
+  const [dailyInsight, setDailyInsight] = useState<DailyInsightReport | null>(
+    null
+  );
+  const [dailyInsightCached, setDailyInsightCached] = useState(false);
+  const [dailyInsightStored, setDailyInsightStored] = useState(false);
+  const [dailyInsightLoading, setDailyInsightLoading] = useState(true);
+  const [dailyInsightRebuilding, setDailyInsightRebuilding] = useState(false);
+  const [dailyInsightError, setDailyInsightError] = useState("");
 
   useEffect(() => {
     async function loadShops() {
@@ -401,9 +418,74 @@ export default function Dashboard() {
     return () => controller.abort();
   }, [dateRange.startDate, dateRange.endDate]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadDailyInsight() {
+      setDailyInsightLoading(true);
+      setDailyInsightError("");
+      try {
+        const response = await fetch("/api/insights/daily", {
+          signal: controller.signal
+        });
+        const payload = (await readJsonResponse(
+          response
+        )) as DailyInsightResponse;
+        if (controller.signal.aborted) {
+          return;
+        }
+        if (!response.ok || !payload.report) {
+          throw new Error(
+            payload.error ?? "Daily insight report request failed"
+          );
+        }
+        setDailyInsight(payload.report);
+        setDailyInsightCached(Boolean(payload.cached));
+        setDailyInsightStored(Boolean(payload.stored));
+      } catch (err) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setDailyInsight(null);
+        setDailyInsightError(err instanceof Error ? err.message : "Unknown error");
+      } finally {
+        if (!controller.signal.aborted) {
+          setDailyInsightLoading(false);
+        }
+      }
+    }
+
+    loadDailyInsight();
+
+    return () => controller.abort();
+  }, []);
+
   function applyPreset(days: number, presetId: DatePresetId) {
     setDatePreset(presetId);
     setDateRange(getPresetRange(days));
+  }
+
+  async function rebuildDailyInsight() {
+    setDailyInsightRebuilding(true);
+    setDailyInsightError("");
+    try {
+      const response = await fetch("/api/insights/daily/rebuild", {
+        method: "POST"
+      });
+      const payload = (await readJsonResponse(
+        response
+      )) as DailyInsightResponse;
+      if (!response.ok || !payload.report) {
+        throw new Error(payload.error ?? "Daily insight rebuild failed");
+      }
+      setDailyInsight(payload.report);
+      setDailyInsightCached(false);
+      setDailyInsightStored(Boolean(payload.stored));
+    } catch (err) {
+      setDailyInsightError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setDailyInsightRebuilding(false);
+    }
   }
 
   const shopNameByNo = useMemo(() => {
@@ -454,6 +536,57 @@ export default function Dashboard() {
     : hasAdSpend
       ? `${money(summaryMarginAfterAds)}원`
       : "-";
+
+  function formatInsightDate(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat("ko-KR", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Seoul"
+    }).format(date);
+  }
+
+  function getInsightProductLabel(product: ProductInsight) {
+    return product.optionName
+      ? `${product.productName} / ${product.optionName}`
+      : product.productName;
+  }
+
+  function renderProductInsightTable({
+    title,
+    products,
+    valueLabel,
+    getValue
+  }: {
+    title: string;
+    products: ProductInsight[];
+    valueLabel: string;
+    getValue: (product: ProductInsight) => string;
+  }) {
+    return (
+      <div className="insightPanel">
+        <h3>{title}</h3>
+        {products.length === 0 ? (
+          <p className="mutedText">표시할 상품이 없습니다.</p>
+        ) : (
+          <ol className="insightList">
+            {products.map((product) => (
+              <li key={product.key}>
+                <span>{getInsightProductLabel(product)}</span>
+                <strong>
+                  {valueLabel} {getValue(product)}
+                </strong>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    );
+  }
 
   return (
     <main className="dashboardShell">
@@ -586,6 +719,139 @@ export default function Dashboard() {
           <span>취소</span>
           <strong>{summary.canceled}</strong>
         </div>
+      </section>
+
+      <section className="insightSection">
+        <div className="insightHeader">
+          <div>
+            <p className="eyebrow">Daily Insight</p>
+            <h2>전날 상품 인사이트</h2>
+            {dailyInsight ? (
+              <p>
+                기준일 {dailyInsight.reportDate} · 생성{" "}
+                {formatInsightDate(dailyInsight.generatedAt)} ·{" "}
+                {dailyInsightCached ? "저장된 리포트" : "새로 계산됨"}
+                {dailyInsightStored ? "" : " · 저장소 미연결"}
+              </p>
+            ) : (
+              <p>전날 하루치 주문을 기준으로 분석합니다.</p>
+            )}
+          </div>
+          <button
+            type="button"
+            className="presetButton"
+            onClick={rebuildDailyInsight}
+            disabled={dailyInsightLoading || dailyInsightRebuilding}
+          >
+            {dailyInsightRebuilding ? "다시 계산 중..." : "다시 계산"}
+          </button>
+        </div>
+
+        {dailyInsightError ? (
+          <p className="errorBox">{dailyInsightError}</p>
+        ) : null}
+
+        {dailyInsightLoading ? (
+          <p className="mutedText">전날 인사이트를 불러오는 중입니다...</p>
+        ) : dailyInsight ? (
+          <>
+            <div className="insightSummaryGrid">
+              <div className="metric">
+                <span>주문</span>
+                <strong>{dailyInsight.summary.orderCount}</strong>
+              </div>
+              <div className="metric">
+                <span>판매수량</span>
+                <strong>{dailyInsight.summary.totalQuantity}</strong>
+              </div>
+              <div className="metric">
+                <span>매출</span>
+                <strong>{money(dailyInsight.summary.totalRevenue)}원</strong>
+              </div>
+              <div className="metric">
+                <span>총마진</span>
+                <strong>{money(dailyInsight.summary.totalMargin)}원</strong>
+              </div>
+              <div className="metric">
+                <span>평균 마진율</span>
+                <strong>{percent(dailyInsight.summary.averageMarginRate)}</strong>
+              </div>
+              <div className="metric">
+                <span>원가 매칭률</span>
+                <strong>{percent(dailyInsight.summary.costMatchRate)}</strong>
+              </div>
+            </div>
+
+            <div className="insightGrid">
+              {renderProductInsightTable({
+                title: "판매량 TOP",
+                products: dailyInsight.topByQuantity,
+                valueLabel: "수량",
+                getValue: (product) => `${product.quantity}개`
+              })}
+              {renderProductInsightTable({
+                title: "매출 TOP",
+                products: dailyInsight.topByRevenue,
+                valueLabel: "매출",
+                getValue: (product) => `${money(product.revenue)}원`
+              })}
+              {renderProductInsightTable({
+                title: "총마진 TOP",
+                products: dailyInsight.topByMargin,
+                valueLabel: "마진",
+                getValue: (product) => `${money(product.margin)}원`
+              })}
+              {renderProductInsightTable({
+                title: "마진율 TOP",
+                products: dailyInsight.topByMarginRate,
+                valueLabel: "마진율",
+                getValue: (product) => percent(product.marginRate)
+              })}
+            </div>
+
+            <div className="insightGrid">
+              <div className="insightPanel">
+                <h3>같이 산 조합 TOP</h3>
+                {dailyInsight.topCombos.length === 0 ? (
+                  <p className="mutedText">조합 주문이 없습니다.</p>
+                ) : (
+                  <ol className="insightList">
+                    {dailyInsight.topCombos.map((combo) => (
+                      <li key={`${combo.productA}-${combo.productB}`}>
+                        <span>
+                          {combo.productA} + {combo.productB}
+                        </span>
+                        <strong>
+                          {combo.orderCount}건 · {money(combo.revenue)}원
+                        </strong>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+
+              <div className="insightPanel">
+                <h3>원가 등록 필요</h3>
+                {dailyInsight.unmatchedProducts.length === 0 ? (
+                  <p className="mutedText">원가 미매칭 상품이 없습니다.</p>
+                ) : (
+                  <ol className="insightList">
+                    {dailyInsight.unmatchedProducts.map((product) => (
+                      <li key={product.key}>
+                        <span>{getInsightProductLabel(product)}</span>
+                        <strong>
+                          {product.quantity}개 · {money(product.revenue)}원
+                        </strong>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className="mutedText">표시할 전날 인사이트가 없습니다.</p>
+        )}
       </section>
 
       {error ? <p className="errorBox">{error}</p> : null}
