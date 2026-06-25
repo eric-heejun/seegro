@@ -52,6 +52,8 @@ export type DailyInsightReport = {
     totalRevenue: number;
     totalCost: number;
     totalMargin: number;
+    adSpend: number | null;
+    adSpendError?: string;
     averageMarginRate: number | null;
     costMatchRate: number | null;
     unmatchedProductCount: number;
@@ -193,10 +195,14 @@ function sortByNumber<T>(items: T[], getValue: (item: T) => number) {
 export function buildDailyInsightReport({
   reportDate,
   orders,
+  adSpend = null,
+  adSpendError,
   generatedAt = new Date().toISOString()
 }: {
   reportDate: string;
   orders: InsightOrder[];
+  adSpend?: number | null;
+  adSpendError?: string;
   generatedAt?: string;
 }): DailyInsightReport {
   const activeOrders = orders.filter((order) => order.canceled !== "T");
@@ -324,6 +330,8 @@ export function buildDailyInsightReport({
       totalRevenue,
       totalCost,
       totalMargin,
+      adSpend,
+      ...(adSpendError ? { adSpendError } : {}),
       averageMarginRate:
         matchedRevenue > 0 ? totalMargin / matchedRevenue : null,
       costMatchRate: totalQuantity > 0 ? matchedQuantity / totalQuantity : null,

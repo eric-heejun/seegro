@@ -163,6 +163,17 @@ function percent(value: number | null) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+function optionalMoney(
+  value: string | number | null | undefined,
+  fallback = "-"
+) {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  return `${money(value)}원`;
+}
+
 function getOrderUnmatchedItemCount(order: Cafe24Order) {
   return (order.items ?? []).filter((item) => !getItemCostMatch(item)).length;
 }
@@ -771,6 +782,15 @@ export default function Dashboard() {
               <div className="metric">
                 <span>총마진</span>
                 <strong>{money(dailyInsight.summary.totalMargin)}원</strong>
+              </div>
+              <div className="metric adSpendMetric">
+                <span>광고비 지출총액</span>
+                <strong>
+                  {optionalMoney(
+                    dailyInsight.summary.adSpend,
+                    dailyInsight.summary.adSpendError ? "조회 실패" : "-"
+                  )}
+                </strong>
               </div>
               <div className="metric">
                 <span>평균 마진율</span>
