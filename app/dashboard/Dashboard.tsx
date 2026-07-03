@@ -793,6 +793,23 @@ export default function Dashboard() {
                 </strong>
               </div>
               <div className="metric">
+                <span>광고 후 마진</span>
+                <strong
+                  className={
+                    dailyInsight.summary.marginAfterAds === null
+                      ? undefined
+                      : dailyInsight.summary.marginAfterAds < 0
+                        ? "negativeValue"
+                        : "positiveValue"
+                  }
+                >
+                  {optionalMoney(
+                    dailyInsight.summary.marginAfterAds,
+                    dailyInsight.summary.adSpendError ? "조회 실패" : "-"
+                  )}
+                </strong>
+              </div>
+              <div className="metric">
                 <span>평균 마진율</span>
                 <strong>{percent(dailyInsight.summary.averageMarginRate)}</strong>
               </div>

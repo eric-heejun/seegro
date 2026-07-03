@@ -53,6 +53,7 @@ export type DailyInsightReport = {
     totalCost: number;
     totalMargin: number;
     adSpend: number | null;
+    marginAfterAds: number | null;
     adSpendError?: string;
     averageMarginRate: number | null;
     costMatchRate: number | null;
@@ -313,6 +314,7 @@ export function buildDailyInsightReport({
     0
   );
   const totalMargin = matchedRevenue - totalCost;
+  const marginAfterAds = adSpend === null ? null : totalMargin - adSpend;
   const comboList = Array.from(combos.values()).map((combo) => ({
     productA: combo.productA,
     productB: combo.productB,
@@ -331,6 +333,7 @@ export function buildDailyInsightReport({
       totalCost,
       totalMargin,
       adSpend,
+      marginAfterAds,
       ...(adSpendError ? { adSpendError } : {}),
       averageMarginRate:
         matchedRevenue > 0 ? totalMargin / matchedRevenue : null,

@@ -25,7 +25,10 @@ function getInsightKey(reportDate: string) {
 }
 
 function hasCurrentSummaryFields(report: DailyInsightReport) {
-  return Object.prototype.hasOwnProperty.call(report.summary, "adSpend");
+  return (
+    Object.prototype.hasOwnProperty.call(report.summary, "adSpend") &&
+    Object.prototype.hasOwnProperty.call(report.summary, "marginAfterAds")
+  );
 }
 
 function getOrigin(request: NextRequest) {
