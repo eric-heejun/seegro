@@ -789,6 +789,26 @@ const COST_CATALOG_DATA: CostGroup[] = [
     "needsReview": false
   },
   {
+    "name": "버드 가든 원형",
+    "aliases": [
+      "버드 가든",
+      "버드가든",
+      "아메리칸플로어 버드 가든",
+      "아메리칸플로어 버드가든"
+    ],
+    "sizes": [
+      [
+        "150*150",
+        48000
+      ],
+      [
+        "150 원형",
+        48000
+      ]
+    ],
+    "needsReview": false
+  },
+  {
     "name": "버드 가든",
     "aliases": [
       "소르베 그리드",
@@ -1047,6 +1067,65 @@ const COST_CATALOG_DATA: CostGroup[] = [
       ]
     ],
     "needsReview": false
+  },
+  {
+    "name": "그립 몬스터",
+    "aliases": [
+      "그립몬스터",
+      "그립 몬스터 밀대",
+      "그립몬스터 밀대"
+    ],
+    "sizes": [
+      [
+        "2+2박스+밀대 1개",
+        17500
+      ],
+      [
+        "1+1박스",
+        7500
+      ]
+    ],
+    "needsReview": false
+  },
+  {
+    "name": "세븐펫 럽럽 펫티슈",
+    "aliases": [
+      "럽럽 펫티슈",
+      "럽럽펫티슈",
+      "세븐펫 펫티슈",
+      "펫티슈"
+    ],
+    "sizes": [
+      [
+        "본품",
+        6600
+      ],
+      [
+        "리필",
+        4400
+      ]
+    ],
+    "needsReview": false
+  },
+  {
+    "name": "냉감 스노우리지",
+    "aliases": [
+      "스노우리지",
+      "스노우 리지",
+      "냉감 스노우 리지",
+      "냉감 스노우리지"
+    ],
+    "sizes": [
+      [
+        "3단 65*180",
+        14500
+      ],
+      [
+        "4단 65*240",
+        18000
+      ]
+    ],
+    "needsReview": false
   }
 ];
 
@@ -1094,6 +1173,7 @@ const NOISE_WORDS = new Set([
 const SIZE_PATTERN = /(\d{2,3})\s*[*xX×]\s*(\d{2,3})/;
 const ROUND_SIZE_PATTERN =
   /(?:(\d{2,3})\s*(?:cm)?\s*원형|원형\s*(\d{2,3})\s*(?:cm)?|(\d{2,3})\s*파이)/;
+const FOLD_PATTERN = /(\d+)\s*단/;
 
 export const COST_ENTRIES: CostEntry[] = [];
 
@@ -1156,6 +1236,19 @@ function hasSameSize(entryOptionName: string, inputText: string) {
   return normalizeSize(inputText) === entrySize;
 }
 
+function getFoldCount(value: string) {
+  return value.match(FOLD_PATTERN)?.[1] ?? "";
+}
+
+function hasCompatibleFold(entryOptionName: string, inputText: string) {
+  const entryFold = getFoldCount(entryOptionName);
+  if (!entryFold) {
+    return true;
+  }
+
+  return getFoldCount(inputText) === entryFold;
+}
+
 type SaleUnit = "piece" | "set" | "";
 
 function getTileCarpetSaleUnit(value: string): SaleUnit {
@@ -1213,7 +1306,7 @@ function hasCompatibleTileCarpetSaleUnit(entry: CostEntry, inputText: string) {
 
 function hasCompatibleSize(entry: CostEntry, inputText: string) {
   if (hasSameSize(entry.optionName, inputText)) {
-    return true;
+    return hasCompatibleFold(entry.optionName, inputText);
   }
 
   if (!isTileCarpetEntry(entry) || normalizeSize(inputText)) {
