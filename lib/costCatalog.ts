@@ -849,6 +849,25 @@ const COST_CATALOG_DATA: CostGroup[] = [
     "needsReview": false
   },
   {
+    "name": "스윔 도어매트",
+    "aliases": [
+      "스윔 도어매트",
+      "스윔도어매트",
+      "스위밍풀 도어매트",
+      "스위밍풀도어매트",
+      "스위밍풀",
+      "아메리칸플로어 스윔 도어매트",
+      "아메리칸플로어 스윔도어매트"
+    ],
+    "sizes": [
+      [
+        "65*45",
+        100
+      ]
+    ],
+    "needsReview": false
+  },
+  {
     "name": "버드 가든",
     "aliases": [
       "소르베 그리드",
