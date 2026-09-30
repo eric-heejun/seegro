@@ -38,6 +38,7 @@ type Cafe24Order = {
   order_date?: string;
   payment_amount?: string;
   total_supply_price?: string;
+  paid?: "T" | "F";
   canceled?: "T" | "F";
   order_place_id?: string;
   order_place_name?: string;
@@ -72,6 +73,14 @@ const SALES_CHANNELS: { id: SalesChannel; label: string }[] = [
 function toNumber(value: unknown) {
   const numberValue = Number(value ?? 0);
   return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function getOrderStatusLabel(order: Cafe24Order) {
+  if (order.canceled === "T") {
+    return "취소";
+  }
+
+  return order.paid === "T" ? "결제완료" : "입금전";
 }
 
 function money(value: string | number | undefined) {
@@ -808,7 +817,7 @@ export default function Dashboard() {
                         {orderCost > 0 ? `${money(orderMargin)}원` : "-"}
                       </td>
                       <td>{orderCost > 0 ? percent(orderMarginRate) : "-"}</td>
-                      <td>{order.canceled === "T" ? "취소" : "정상"}</td>
+                      <td>{getOrderStatusLabel(order)}</td>
                     </tr>
                   );
                 })
